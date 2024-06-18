@@ -1,8 +1,5 @@
+export 'sliver.dart';
+export 'sliver_list.dart';
 
-import 'recycler_list_platform_interface.dart';
-
-class RecyclerList {
-  Future<String?> getPlatformVersion() {
-    return RecyclerListPlatform.instance.getPlatformVersion();
-  }
-}
+/// if true, print log
+var debug = false;
