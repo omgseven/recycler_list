@@ -1,12 +1,17 @@
+import 'dart:math' as math;
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/rendering.dart';
 
 import 'sliver.dart';
 import 'sliver_list.dart';
+import 'scroll_delegate.dart';
 
 class RecyclerListView extends ListView {
 
   final ItemType? itemType;
+
+  @override
+  final SliverChildDelegate childrenDelegate;
 
   /// Same as [ListView] but with a [itemType] parameter.
   RecyclerListView.builder({
@@ -22,19 +27,43 @@ class RecyclerListView extends ListView {
     super.itemExtentBuilder,
     super.prototypeItem,
     this.itemType,
-    required super.itemBuilder,
-    super.findChildIndexCallback,
-    super.itemCount,
-    super.addAutomaticKeepAlives,
-    super.addRepaintBoundaries,
-    super.addSemanticIndexes,
+    required NullableIndexedWidgetBuilder itemBuilder,
+    ChildIndexGetter? findChildIndexCallback,
+    int? itemCount,
+    bool addAutomaticKeepAlives = true,
+    bool addRepaintBoundaries = true,
+    bool addSemanticIndexes = true,
     super.cacheExtent,
-    super.semanticChildCount,
+    int? semanticChildCount,
     super.dragStartBehavior,
     super.keyboardDismissBehavior,
     super.restorationId,
     super.clipBehavior,
-  }): super.builder();
+  })  : assert(itemCount == null || itemCount >= 0),
+        assert(semanticChildCount == null || semanticChildCount <= itemCount!),
+        assert(
+          (itemExtent == null && prototypeItem == null) ||
+          (itemExtent == null && itemExtentBuilder == null) ||
+          (prototypeItem == null && itemExtentBuilder == null),
+          'You can only pass one of itemExtent, prototypeItem and itemExtentBuilder.',
+        ),
+        childrenDelegate = TypedSliverChildBuilderDelegate(
+          itemBuilder,
+          itemType: itemType != null ? (int index) {
+            if (itemCount != null && index >= itemCount) {
+              return null;
+            }
+            return itemType?.call(index);
+          } : null,
+          findChildIndexCallback: findChildIndexCallback,
+          childCount: itemCount,
+          addAutomaticKeepAlives: addAutomaticKeepAlives,
+          addRepaintBoundaries: addRepaintBoundaries,
+          addSemanticIndexes: addSemanticIndexes,
+        ),
+        super(
+          semanticChildCount: semanticChildCount ?? itemCount,
+        );
 
   /// Same as [ListView] but with a [itemType] parameter.
   RecyclerListView.separated({
@@ -47,19 +76,47 @@ class RecyclerListView extends ListView {
     super.shrinkWrap,
     super.padding,
     this.itemType,
-    required super.itemBuilder,
-    super.findChildIndexCallback,
-    required super.separatorBuilder,
-    required super.itemCount,
-    super.addAutomaticKeepAlives,
-    super.addRepaintBoundaries,
-    super. addSemanticIndexes,
+    required NullableIndexedWidgetBuilder itemBuilder,
+    ChildIndexGetter? findChildIndexCallback,
+    required IndexedWidgetBuilder separatorBuilder,
+    required int itemCount,
+    bool addAutomaticKeepAlives = true,
+    bool addRepaintBoundaries = true,
+    bool addSemanticIndexes = true,
     super.cacheExtent,
+    int? semanticChildCount,
     super.dragStartBehavior,
     super.keyboardDismissBehavior,
     super.restorationId,
     super.clipBehavior,
-  }) : super.separated();
+  })  : assert(itemCount >= 0),
+        childrenDelegate = TypedSliverChildBuilderDelegate(
+          (BuildContext context, int index) {
+            final int itemIndex = index ~/ 2;
+            if (index.isEven) {
+              return itemBuilder(context, itemIndex);
+            }
+            return separatorBuilder(context, itemIndex);
+          },
+          itemType: itemType != null ? (int index) {
+            if (index.isOdd) {
+              return 'separator';
+            }
+            final itemIndex = index ~/ 2;
+            return itemIndex <= itemCount ? itemType?.call(itemIndex) : null;
+          } : null,
+          findChildIndexCallback: findChildIndexCallback,
+          childCount: _computeActualChildCount(itemCount),
+          addAutomaticKeepAlives: addAutomaticKeepAlives,
+          addRepaintBoundaries: addRepaintBoundaries,
+          addSemanticIndexes: addSemanticIndexes,
+          semanticIndexCallback: (Widget widget, int index) {
+            return index.isEven ? index ~/ 2 : null;
+          },
+        ),
+        super(
+          semanticChildCount: itemCount,
+        );
 
   /// Same as [ListView] but with a [itemType] parameter.
   const RecyclerListView.custom({
@@ -75,15 +132,19 @@ class RecyclerListView extends ListView {
     super.itemExtent,
     super.prototypeItem,
     super.itemExtentBuilder,
-    required super.childrenDelegate,
+    required this.childrenDelegate,
     super.cacheExtent,
     super.semanticChildCount,
     super.dragStartBehavior,
     super.keyboardDismissBehavior,
     super.restorationId,
     super.clipBehavior,
-  }) : super.custom();
-
+  })  : assert(
+          childrenDelegate is ItemTyper,
+          'childrenDelegate must mixin ItemTyper',
+        ),
+        super.custom(childrenDelegate: childrenDelegate);
+  
   @override
   Widget buildChildLayout(BuildContext context) {
     // TODO: support itemExtent, itemExtentBuilder, prototypeItem
@@ -105,8 +166,12 @@ class RecyclerListView extends ListView {
     // }
     return RecyclerSliverList(
       delegate: childrenDelegate,
-      itemType: itemType,
     );
+  }
+
+  // Helper method to compute the actual child count for the separated constructor.
+  static int _computeActualChildCount(int itemCount) {
+    return math.max(0, itemCount * 2 - 1);
   }
 }
 
@@ -116,41 +181,35 @@ class RecyclerSliverList extends SliverList {
   const RecyclerSliverList({
     super.key,
     required super.delegate,
-    this.itemType,
   });
-
-  final ItemType? itemType;
-
-  /// Same as [SliverList] but with a [itemType] parameter.
+  
+  /// Same as [SliverList]
   RecyclerSliverList.builder({
     super.key,
     required super.itemBuilder,
     super.findChildIndexCallback,
-    this.itemType,
     super.itemCount,
     super.addAutomaticKeepAlives,
     super.addRepaintBoundaries,
     super.addSemanticIndexes,
   }) : super.builder();
 
-  /// Same as [SliverList] but with a [itemType] parameter.
+  /// Same as [SliverList]
   RecyclerSliverList.separated({
     super.key,
     required super.itemBuilder,
     super.findChildIndexCallback,
     required super.separatorBuilder,
-    this.itemType,
     super.itemCount,
     super.addAutomaticKeepAlives,
     super.addRepaintBoundaries,
     super.addSemanticIndexes,
   }) : super.separated();
 
-  /// Same as [SliverList] but with a [itemType] parameter.
+  /// Same as [SliverList]
   RecyclerSliverList.list({
     super.key,
     required super.children,
-    this.itemType,
     super.addAutomaticKeepAlives,
     super.addRepaintBoundaries,
     super.addSemanticIndexes,
@@ -160,7 +219,6 @@ class RecyclerSliverList extends SliverList {
   SliverMultiBoxAdaptorElement createElement() => RecyclerSliverMultiBoxAdaptorElement(
         this,
         replaceMovedChildren: true,
-        itemType: itemType,
       );
 
   @override

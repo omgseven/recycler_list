@@ -1,5 +1,3 @@
-export 'src/sliver.dart' show ItemType;
+export 'src/debug.dart';
 export 'src/list.dart';
-
-/// if true, print log
-var debug = false;
+export 'src/sliver.dart' show ItemType;

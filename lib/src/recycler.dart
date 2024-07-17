@@ -10,6 +10,10 @@ class Recycler<T> {
 
   Map<Object, List<T>> get caches => _caches;
 
+  void clear() {
+    caches.clear();
+  }
+
   void recycle(Object type, T child) {
     _caches.putIfAbsent(type, () => []).add(child);
     _counter++;

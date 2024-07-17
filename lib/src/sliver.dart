@@ -1,12 +1,15 @@
 import 'dart:collection';
+import 'dart:developer';
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/rendering.dart';
+import 'package:recycler_list/recycler_list.dart';
 
 import 'recycler.dart';
+import 'scroll_delegate.dart';
 import 'sliver_list.dart';
 
-typedef ItemType = Object Function(int index);
+typedef ItemType = Object? Function(int index);
 
 /// An element that lazily builds children for a [SliverMultiBoxAdaptorWidget].
 ///
@@ -24,14 +27,14 @@ class RecyclerSliverMultiBoxAdaptorElement extends SliverMultiBoxAdaptorElement 
   /// layout offset of their children without looking at the layout offset of
   /// existing children this should be set to false (example:
   /// [RenderSliverFixedExtentList]) to avoid inflating unnecessary children.
-  RecyclerSliverMultiBoxAdaptorElement(super.widget, {bool replaceMovedChildren = false, this.itemType})
+  RecyclerSliverMultiBoxAdaptorElement(super.widget, {bool replaceMovedChildren = false})
       : _replaceMovedChildren = replaceMovedChildren;
 
   final bool _replaceMovedChildren;
 
-  final ItemType? itemType;
-
   final Recycler<Element> _recycler = Recycler<Element>();
+
+  ItemTyper get itemTyper => (widget as SliverMultiBoxAdaptorWidget).delegate as ItemTyper;
 
   @override
   RecyclerRenderSliverList get renderObject => super.renderObject as RecyclerRenderSliverList;
@@ -140,7 +143,7 @@ class RecyclerSliverMultiBoxAdaptorElement extends SliverMultiBoxAdaptorElement 
       try {
         final SliverMultiBoxAdaptorWidget adaptorWidget = widget as SliverMultiBoxAdaptorWidget;
         _currentlyUpdatingChildIndex = index;
-        final obtainedChild = _obtainChild(index);
+        final obtainedChild = _obtainChild(index, adaptorWidget);
         newChild = updateChild(obtainedChild, _build(index, adaptorWidget), index);
       } finally {
         _currentlyUpdatingChildIndex = null;
@@ -159,7 +162,7 @@ class RecyclerSliverMultiBoxAdaptorElement extends SliverMultiBoxAdaptorElement 
     assert(child.slot != null);
     assert(_childElements.containsKey(child.slot));
     _childElements.remove(child.slot);
-    _recycleChild(child, child.slot as int);
+    // _recycleChild(child, child.slot as int);
     super.forgetChild(child);
   }
 
@@ -169,13 +172,13 @@ class RecyclerSliverMultiBoxAdaptorElement extends SliverMultiBoxAdaptorElement 
     assert(_currentlyUpdatingChildIndex == null);
     assert(index >= 0);
     owner!.buildScope(this, () {
+      Element? testElemen; // TODO delete
       assert(_childElements.containsKey(index));
       try {
         _currentlyUpdatingChildIndex = index;
         final element = _childElements[index];
-        if (itemType != null) {
-          _recycleChild(element, index);
-        } else {
+        testElemen = element; // TODO delete
+        if (itemTyper.itemType == null || !_recycleChild(element, index)) {
           final Element? result = updateChild(_childElements[index], null, index);
           assert(result == null);
         }
@@ -184,15 +187,32 @@ class RecyclerSliverMultiBoxAdaptorElement extends SliverMultiBoxAdaptorElement 
       }
       _childElements.remove(index);
       assert(!_childElements.containsKey(index));
+      // TODO delete
+      // TODO delete
+      // TODO delete
+      if (child.parent != null) {
+        debugger(message: 'sevenn debug 222');
+        _recycleChild(testElemen!, index);
+      }
+      assert(child.parent == null);
     });
   }
 
   /// [New Feature] Obtain child element.
-  Element? _obtainChild(int index) {
+  Element? _obtainChild(int index, SliverMultiBoxAdaptorWidget widget) {
     Element? child = _childElements[index];
-    if (child == null && itemType != null) {
-      final type = itemType!.call(index);
+    if (child == null && itemTyper.itemType != null) {
+      if (index < 0 || index >= childCount) {
+        _onNotObtainChild(child, index);
+        return null;
+      }
+      final type = itemTyper.itemType!.call(index);
+      if (type == null) {
+        _onNotObtainChild(child, index);
+        return child;
+      }
       child = _recycler.obtain(type);
+      _onObtainChild(child, index);
       final childRenderObject = child?.renderObject;
       if (child != null && childRenderObject is RenderBox) {
         renderObject.obtainChild(childRenderObject, index);
@@ -202,13 +222,16 @@ class RecyclerSliverMultiBoxAdaptorElement extends SliverMultiBoxAdaptorElement 
   }
 
   /// [New Feature] Recycle child element.
-  void _recycleChild(Element? child, int index) {
+  bool _recycleChild(Element? child, int index) {
     if (child == null) {
-      return;
+      return false;
     }
     assert(child.slot != null);
-    assert(itemType != null);
-    final type = itemType!.call(index);
+    assert(itemTyper.itemType != null);
+    final type = itemTyper.itemType!.call(index);
+    if (type == null) {
+      return false;
+    }
     final childRenderObject = child.renderObject;
     if (childRenderObject is RenderBox) {
       final parentData = childRenderObject.parentData as SliverMultiBoxAdaptorParentData;
@@ -216,6 +239,56 @@ class RecyclerSliverMultiBoxAdaptorElement extends SliverMultiBoxAdaptorElement 
       renderObject.recycleChild(childRenderObject);
     }
     _recycler.recycle(type, child);
+    _onRecycleChild(child, index);
+    return true;
+  }
+
+  /// [New Feature] Deactivate recycled child element.
+  void _deactivateRecycledChildren() {
+    assert(_currentlyUpdatingRecycledChild == false);
+    try {
+      _currentlyUpdatingRecycledChild = true;
+      for (var typeList in _recycler.caches.values) {
+        for (var e in typeList) {
+          final childRenderObject = e.renderObject;
+          if (childRenderObject is RenderBox) {
+            renderObject.setupParentData(childRenderObject);
+          }
+          deactivateChild(e);
+        }
+      }
+    } finally {
+      _recycler.clear();
+      _currentlyUpdatingRecycledChild = false;
+    }
+  }
+
+  void _onNotObtainChild(Element? child, int index) {
+    if (debugRecyclerList) {
+      Logger.d('RecyclerList ----------- fail obtain $index');
+    }
+  }
+
+  void _onObtainChild(Element? child, int index) {
+    if (debugRecyclerList) {
+      if (child == null) {
+        Logger.d('RecyclerList ----------- create $index');
+      } else {
+        Logger.d('RecyclerList >>>>>>>>>>> obtain $index');
+      }
+    }
+  }
+
+  void _onRecycleChild(Element? child, int index) {
+    if (debugRecyclerList) {
+      Logger.d('RecyclerList <<<<<<<<<<< recycle $index');
+    }
+  }
+
+  @override
+  void deactivate() {
+    _deactivateRecycledChildren();
+    super.deactivate();
   }
 
   static double _extrapolateMaxScrollOffset(
@@ -271,6 +344,8 @@ class RecyclerSliverMultiBoxAdaptorElement extends SliverMultiBoxAdaptorElement 
 
   int? _currentlyUpdatingChildIndex;
 
+  bool _currentlyUpdatingRecycledChild = false;
+
   @override
   bool debugAssertChildListLocked() {
     assert(_currentlyUpdatingChildIndex == null);
@@ -311,6 +386,9 @@ class RecyclerSliverMultiBoxAdaptorElement extends SliverMultiBoxAdaptorElement 
 
   @override
   void removeRenderObjectChild(covariant RenderObject child, int slot) {
+    if (_currentlyUpdatingRecycledChild) {
+      return;
+    }
     assert(_currentlyUpdatingChildIndex != null);
     renderObject.remove(child as RenderBox);
   }
