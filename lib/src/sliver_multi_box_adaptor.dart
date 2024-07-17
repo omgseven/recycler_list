@@ -1,6 +1,5 @@
 import 'package:flutter/rendering.dart';
 
-import '../recycler_list.dart';
 
 mixin RecyclerRenderSliverMultiBoxAdaptorMixin on RenderSliverMultiBoxAdaptor {
 
