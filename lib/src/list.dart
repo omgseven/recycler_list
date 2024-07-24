@@ -53,7 +53,7 @@ class RecyclerListView extends ListView {
             if (itemCount != null && index >= itemCount) {
               return null;
             }
-            return itemType?.call(index);
+            return itemType.call(index);
           } : null,
           findChildIndexCallback: findChildIndexCallback,
           childCount: itemCount,
@@ -103,7 +103,7 @@ class RecyclerListView extends ListView {
               return 'separator';
             }
             final itemIndex = index ~/ 2;
-            return itemIndex <= itemCount ? itemType?.call(itemIndex) : null;
+            return itemIndex <= itemCount ? itemType.call(itemIndex) : null;
           } : null,
           findChildIndexCallback: findChildIndexCallback,
           childCount: _computeActualChildCount(itemCount),
