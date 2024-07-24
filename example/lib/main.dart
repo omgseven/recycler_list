@@ -1,8 +1,9 @@
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
-import 'package:recycler_list/list.dart';
+import 'package:recycler_list/recycler_list.dart';
 
 void main() {
   runApp(const MyApp());
@@ -38,9 +39,10 @@ class _MyAppState extends State<MyApp> {
 
   Widget myList() {
     return RecyclerListView.builder(
-      itemCount: 100,
+      cacheExtent: 10,
+      itemCount: 1000,
       itemType: (index) {
-        return index % 2; // TODO enum
+        return index % 2;
       },
       itemBuilder: (_, index) {
         Widget cur = Container(
