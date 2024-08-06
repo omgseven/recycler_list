@@ -14,6 +14,47 @@ class RecyclerListView extends ListView {
   final SliverChildDelegate childrenDelegate;
 
   /// Same as [ListView] but with a [itemType] parameter.
+  RecyclerListView({
+    super.key,
+    super.scrollDirection,
+    super.reverse,
+    super.controller,
+    super.primary,
+    super.physics,
+    super.shrinkWrap,
+    super.padding,
+    this.itemType,
+    super.itemExtent,
+    super.itemExtentBuilder,
+    super.prototypeItem,
+    bool addAutomaticKeepAlives = true,
+    bool addRepaintBoundaries = true,
+    bool addSemanticIndexes = true,
+    super.cacheExtent,
+    List<Widget> children = const <Widget>[],
+    int? semanticChildCount,
+    super.dragStartBehavior,
+    super.keyboardDismissBehavior,
+    super.restorationId,
+    super.clipBehavior,
+  })  : assert(
+          (itemExtent == null && prototypeItem == null) ||
+              (itemExtent == null && itemExtentBuilder == null) ||
+              (prototypeItem == null && itemExtentBuilder == null),
+          'You can only pass one of itemExtent, prototypeItem and itemExtentBuilder.',
+        ),
+        childrenDelegate = TypedSliverChildListDelegate(
+          children,
+          itemType: itemType,
+          addAutomaticKeepAlives: addAutomaticKeepAlives,
+          addRepaintBoundaries: addRepaintBoundaries,
+          addSemanticIndexes: addSemanticIndexes,
+        ),
+        super(
+          semanticChildCount: semanticChildCount ?? children.length,
+        );
+
+  /// Same as [ListView] but with a [itemType] parameter.
   RecyclerListView.builder({
     super.key,
     super.scrollDirection,
@@ -30,6 +71,7 @@ class RecyclerListView extends ListView {
     required NullableIndexedWidgetBuilder itemBuilder,
     ChildIndexGetter? findChildIndexCallback,
     int? itemCount,
+    ValueNotifier<int>? itemCountNotifier,
     bool addAutomaticKeepAlives = true,
     bool addRepaintBoundaries = true,
     bool addSemanticIndexes = true,
@@ -50,11 +92,13 @@ class RecyclerListView extends ListView {
         childrenDelegate = TypedSliverChildBuilderDelegate(
           itemBuilder,
           itemType: itemType != null ? (int index) {
-            if (itemCount != null && index >= itemCount) {
+            final count = itemCountNotifier?.value ?? itemCount;
+            if (count != null && index >= count) {
               return null;
             }
             return itemType.call(index);
           } : null,
+          itemCountNotifier: itemCountNotifier,
           findChildIndexCallback: findChildIndexCallback,
           childCount: itemCount,
           addAutomaticKeepAlives: addAutomaticKeepAlives,
@@ -80,6 +124,7 @@ class RecyclerListView extends ListView {
     ChildIndexGetter? findChildIndexCallback,
     required IndexedWidgetBuilder separatorBuilder,
     required int itemCount,
+    ValueNotifier<int>? itemCountNotifier,
     bool addAutomaticKeepAlives = true,
     bool addRepaintBoundaries = true,
     bool addSemanticIndexes = true,
@@ -102,9 +147,11 @@ class RecyclerListView extends ListView {
             if (index.isOdd) {
               return 'separator';
             }
+            final count = itemCountNotifier?.value ?? itemCount;
             final itemIndex = index ~/ 2;
-            return itemIndex <= itemCount ? itemType.call(itemIndex) : null;
+            return itemIndex <= count ? itemType.call(itemIndex) : null;
           } : null,
+          itemCountNotifier: itemCountNotifier,
           findChildIndexCallback: findChildIndexCallback,
           childCount: _computeActualChildCount(itemCount),
           addAutomaticKeepAlives: addAutomaticKeepAlives,
@@ -224,6 +271,38 @@ class RecyclerSliverList extends SliverList {
   @override
   RenderSliverList createRenderObject(BuildContext context) {
     final SliverMultiBoxAdaptorElement element = context as SliverMultiBoxAdaptorElement;
-    return RecyclerRenderSliverList(childManager: element);
+    final renderObject = RecyclerRenderSliverList(childManager: element);
+    _listenForItemCountChanges(renderObject);
+    return renderObject;
+  }
+
+  @override
+  void updateRenderObject(BuildContext context, covariant RenderObject renderObject) {
+    super.updateRenderObject(context, renderObject);
+    _listenForItemCountChanges(renderObject);
+  }
+
+  @override
+  void didUnmountRenderObject(covariant RenderObject renderObject) {
+    _stopListeningForItemCountChanges(renderObject);
+    super.didUnmountRenderObject(renderObject);
+  }
+
+  void _listenForItemCountChanges(RenderObject renderObject) {
+    if (delegate is DataSetAppend) {
+      final dataSetAppend = this.delegate as DataSetAppend;
+      dataSetAppend.itemCountNotifier
+          ?.removeListener(renderObject.markNeedsLayoutForSizedByParentChange);
+      dataSetAppend.itemCountNotifier
+          ?.addListener(renderObject.markNeedsLayoutForSizedByParentChange);
+    }
+  }
+
+  void _stopListeningForItemCountChanges(RenderObject renderObject) {
+    if (delegate is DataSetAppend) {
+      (delegate as DataSetAppend)
+          .itemCountNotifier
+          ?.removeListener(renderObject.markNeedsLayoutForSizedByParentChange);
+    }
   }
 }

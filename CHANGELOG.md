@@ -1,3 +1,5 @@
-## 0.1.0
+## 0.1.1
+* add itemCountNotifier to avoid rebuild after loading more data
 
+## 0.1.0
 * Add recycler_list

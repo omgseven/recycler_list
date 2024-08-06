@@ -1,6 +1,6 @@
+import 'dart:async';
 import 'dart:math' as math;
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:recycler_list/recycler_list.dart';
@@ -18,11 +18,27 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
 
+  static const initialItemCount = 100;
+  final itemCountNotifier = ValueNotifier<int>(0);
+  final testData = List.generate(initialItemCount, (index) => 'item $index');
+  Timer? timer;
+
   @override
   void initState() {
     super.initState();
+    itemCountNotifier.value = testData.length;
+    timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      testData.add('item ${testData.length}');
+      itemCountNotifier.value = testData.length;
+    });
   }
 
+  @override
+  void dispose() {
+    timer?.cancel();
+    itemCountNotifier.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -40,10 +56,11 @@ class _MyAppState extends State<MyApp> {
   Widget myList() {
     return RecyclerListView.builder(
       cacheExtent: 10,
-      itemCount: 1000,
+      itemCount: initialItemCount,
       itemType: (index) {
         return index % 2;
       },
+      itemCountNotifier: itemCountNotifier,
       itemBuilder: (_, index) {
         Widget cur = Container(
           height: 100,
