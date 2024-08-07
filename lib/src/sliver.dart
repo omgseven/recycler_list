@@ -24,7 +24,7 @@ class RecyclerSliverMultiBoxAdaptorElement extends SliverMultiBoxAdaptorElement 
 
   @override
   void createChild(int index, { required RenderBox? after }) {
-    _creatingChild = index;
+    _creatingChild = _checkCreatingChildIndex(index, after: after);
     super.createChild(index, after: after);
     _creatingChild = -1;
   }
@@ -66,6 +66,20 @@ class RecyclerSliverMultiBoxAdaptorElement extends SliverMultiBoxAdaptorElement 
   void deactivate() {
     _deactivateRecycledChildren();
     super.deactivate();
+  }
+
+  /// [New Feature] Check creating child index.
+  /// Avoid creating child when after already has a `next` item.
+  /// In some cases like [1, 2] children is keep alive, and [3] is not, while
+  /// rebuild listView after scroll [1, 2] out of screen, [3] will be created.
+  ///
+  /// see [RenderSliverList.performLayout.insertAndLayoutChild]
+  int _checkCreatingChildIndex(int index, {RenderBox? after}) {
+    if (after == null) {
+      return index;
+    }
+    final childAtIndex = renderObject.childAfter(after);
+    return childAtIndex == null ? index : -1;
   }
 
   /// [New Feature] Obtain child element.
