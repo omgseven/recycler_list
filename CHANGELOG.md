@@ -1,3 +1,6 @@
+## 0.1.3
+* RecyclerListView add `OnVisibilityChanged` callback
+
 ## 0.1.2
 * fix rebuild issue
 

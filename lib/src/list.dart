@@ -1,14 +1,12 @@
 import 'dart:math' as math;
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/rendering.dart';
 
 import 'sliver.dart';
 import 'sliver_list.dart';
 import 'scroll_delegate.dart';
+import 'sliver_multi_box_adaptor.dart';
 
 class RecyclerListView extends ListView {
-
-  final ItemType? itemType;
 
   @override
   final SliverChildDelegate childrenDelegate;
@@ -23,7 +21,8 @@ class RecyclerListView extends ListView {
     super.physics,
     super.shrinkWrap,
     super.padding,
-    this.itemType,
+    ItemType? itemType,
+    OnVisibilityChanged? childVisibilityChanged,
     super.itemExtent,
     super.itemExtentBuilder,
     super.prototypeItem,
@@ -46,6 +45,7 @@ class RecyclerListView extends ListView {
         childrenDelegate = TypedSliverChildListDelegate(
           children,
           itemType: itemType,
+          childVisibilityChanged: childVisibilityChanged,
           addAutomaticKeepAlives: addAutomaticKeepAlives,
           addRepaintBoundaries: addRepaintBoundaries,
           addSemanticIndexes: addSemanticIndexes,
@@ -67,11 +67,12 @@ class RecyclerListView extends ListView {
     super.itemExtent,
     super.itemExtentBuilder,
     super.prototypeItem,
-    this.itemType,
+    ItemType? itemType,
     required NullableIndexedWidgetBuilder itemBuilder,
     ChildIndexGetter? findChildIndexCallback,
     int? itemCount,
-    ValueNotifier<int>? itemCountNotifier,
+    ValueNotifier<int>? childCountNotifier,
+    OnVisibilityChanged? childVisibilityChanged,
     bool addAutomaticKeepAlives = true,
     bool addRepaintBoundaries = true,
     bool addSemanticIndexes = true,
@@ -92,13 +93,14 @@ class RecyclerListView extends ListView {
         childrenDelegate = TypedSliverChildBuilderDelegate(
           itemBuilder,
           itemType: itemType != null ? (int index) {
-            final count = itemCountNotifier?.value ?? itemCount;
+            final count = childCountNotifier?.value ?? itemCount;
             if (count != null && index >= count) {
               return null;
             }
             return itemType.call(index);
           } : null,
-          itemCountNotifier: itemCountNotifier,
+          childVisibilityChanged: childVisibilityChanged,
+          childCountNotifier: childCountNotifier,
           findChildIndexCallback: findChildIndexCallback,
           childCount: itemCount,
           addAutomaticKeepAlives: addAutomaticKeepAlives,
@@ -119,12 +121,13 @@ class RecyclerListView extends ListView {
     super.physics,
     super.shrinkWrap,
     super.padding,
-    this.itemType,
+    ItemType? itemType,
     required NullableIndexedWidgetBuilder itemBuilder,
     ChildIndexGetter? findChildIndexCallback,
     required IndexedWidgetBuilder separatorBuilder,
     required int itemCount,
-    ValueNotifier<int>? itemCountNotifier,
+    ValueNotifier<int>? childCountNotifier,
+    OnVisibilityChanged? childVisibilityChanged,
     bool addAutomaticKeepAlives = true,
     bool addRepaintBoundaries = true,
     bool addSemanticIndexes = true,
@@ -147,13 +150,24 @@ class RecyclerListView extends ListView {
             if (index.isOdd) {
               return 'separator';
             }
-            final count = itemCountNotifier?.value ?? itemCount;
+            final count = childCountNotifier?.value ?? itemCount;
             final itemIndex = index ~/ 2;
             return itemIndex <= count ? itemType.call(itemIndex) : null;
           } : null,
-          itemCountNotifier: itemCountNotifier,
+          childVisibilityChanged: childVisibilityChanged != null ? (int index, VisibilityInfo info) {
+            if (index.isOdd) {
+              return;
+            }
+            final itemIndex = index ~/ 2;
+            final count = childCountNotifier?.value ?? itemCount;
+            if (itemIndex <= count) {
+              childVisibilityChanged(itemIndex, info);
+            }
+          } : null,
+          childCountNotifier: childCountNotifier,
+          childCountFixer: _computeActualChildCountWithSeparator,
           findChildIndexCallback: findChildIndexCallback,
-          childCount: _computeActualChildCount(itemCount),
+          childCount: _computeActualChildCountWithSeparator(itemCount),
           addAutomaticKeepAlives: addAutomaticKeepAlives,
           addRepaintBoundaries: addRepaintBoundaries,
           addSemanticIndexes: addSemanticIndexes,
@@ -175,7 +189,6 @@ class RecyclerListView extends ListView {
     super.physics,
     super.shrinkWrap,
     super.padding,
-    this.itemType,
     super.itemExtent,
     super.prototypeItem,
     super.itemExtentBuilder,
@@ -213,96 +226,195 @@ class RecyclerListView extends ListView {
     // }
     return RecyclerSliverList(
       delegate: childrenDelegate,
-    );
-  }
 
-  // Helper method to compute the actual child count for the separated constructor.
-  static int _computeActualChildCount(int itemCount) {
-    return math.max(0, itemCount * 2 - 1);
+    );
   }
 }
 
+// Helper method to compute the actual child count for the separated constructor.
+int _computeActualChildCountWithSeparator(int itemCount) {
+  return math.max(0, itemCount * 2 - 1);
+}
 
-class RecyclerSliverList extends SliverList {
+/// Same as [SliverList] but with a few additional features.
+///
+/// [SliverListRecycler] provides recycler support.
+/// [SliverListDataSetAppend] avoids rebuilding the entire list when the child count changes.
+/// [SliverListVisibilityChange] provides visibility change callback.
+class RecyclerSliverList extends SliverList
+    with
+        SliverListRecycler,
+        SliverListDataSetAppend,
+        SliverListVisibilityChange {
   /// Creates a sliver that places box children in a linear array.
   const RecyclerSliverList({
     super.key,
     required super.delegate,
   });
-  
+
   /// Same as [SliverList]
   RecyclerSliverList.builder({
     super.key,
-    required super.itemBuilder,
-    super.findChildIndexCallback,
-    super.itemCount,
-    super.addAutomaticKeepAlives,
-    super.addRepaintBoundaries,
-    super.addSemanticIndexes,
-  }) : super.builder();
+    ItemType? itemType,
+    OnVisibilityChanged? childVisibilityChanged,
+    required NullableIndexedWidgetBuilder itemBuilder,
+    ChildIndexGetter? findChildIndexCallback,
+    int? itemCount,
+    bool addAutomaticKeepAlives = true,
+    bool addRepaintBoundaries = true,
+    bool addSemanticIndexes = true,
+  }) : super(delegate: TypedSliverChildBuilderDelegate(
+          itemBuilder,
+          itemType: itemType,
+          childVisibilityChanged: childVisibilityChanged,
+          findChildIndexCallback: findChildIndexCallback,
+          childCount: itemCount,
+          addAutomaticKeepAlives: addAutomaticKeepAlives,
+          addRepaintBoundaries: addRepaintBoundaries,
+          addSemanticIndexes: addSemanticIndexes,
+        ));
 
   /// Same as [SliverList]
   RecyclerSliverList.separated({
     super.key,
-    required super.itemBuilder,
-    super.findChildIndexCallback,
-    required super.separatorBuilder,
-    super.itemCount,
-    super.addAutomaticKeepAlives,
-    super.addRepaintBoundaries,
-    super.addSemanticIndexes,
-  }) : super.separated();
+    ItemType? itemType,
+    OnVisibilityChanged? childVisibilityChanged,
+    required NullableIndexedWidgetBuilder itemBuilder,
+    ChildIndexGetter? findChildIndexCallback,
+    required NullableIndexedWidgetBuilder separatorBuilder,
+    int? itemCount,
+    bool addAutomaticKeepAlives = true,
+    bool addRepaintBoundaries = true,
+    bool addSemanticIndexes = true,
+  }) : super(delegate: TypedSliverChildBuilderDelegate(
+          (BuildContext context, int index) {
+            final int itemIndex = index ~/ 2;
+            final Widget? widget;
+            if (index.isEven) {
+              widget = itemBuilder(context, itemIndex);
+            } else {
+              widget = separatorBuilder(context, itemIndex);
+              assert(() {
+                if (widget == null) {
+                  throw FlutterError('separatorBuilder cannot return null.');
+                }
+                return true;
+              }());
+            }
+            return widget;
+          },
+          itemType: itemType != null ? (int index) {
+            if (index.isOdd) {
+              return 'separator';
+            }
+            return itemType.call(index ~/ 2);
+          } : null,
+          childVisibilityChanged: childVisibilityChanged != null ? (int index, VisibilityInfo info) {
+            if (index.isOdd) {
+              return;
+            }
+            final itemIndex = index ~/ 2;
+            childVisibilityChanged(itemIndex, info);
+          } : null,
+          childCountFixer: _computeActualChildCountWithSeparator,
+          findChildIndexCallback: findChildIndexCallback,
+          childCount: itemCount == null ? null : _computeActualChildCountWithSeparator(itemCount),
+          addAutomaticKeepAlives: addAutomaticKeepAlives,
+          addRepaintBoundaries: addRepaintBoundaries,
+          addSemanticIndexes: addSemanticIndexes,
+          semanticIndexCallback: (Widget _, int index) {
+            return index.isEven ? index ~/ 2 : null;
+          },
+        ));
 
   /// Same as [SliverList]
   RecyclerSliverList.list({
     super.key,
-    required super.children,
-    super.addAutomaticKeepAlives,
-    super.addRepaintBoundaries,
-    super.addSemanticIndexes,
-  }) : super.list();
+    required List<Widget> children,
+    ItemType? itemType,
+    OnVisibilityChanged? childVisibilityChanged,
+    bool addAutomaticKeepAlives = true,
+    bool addRepaintBoundaries = true,
+    bool addSemanticIndexes = true,
+  }) : super(delegate: TypedSliverChildListDelegate(
+    children,
+    itemType: itemType,
+    childVisibilityChanged: childVisibilityChanged,
+    addAutomaticKeepAlives: addAutomaticKeepAlives,
+    addRepaintBoundaries: addRepaintBoundaries,
+    addSemanticIndexes: addSemanticIndexes,
+  ));
+
+}
+
+/// A mixin that adds recycler support to [SliverMultiBoxAdaptorWidget].
+///
+/// see [RecyclerSliverMultiBoxAdaptorElement]
+/// see [RecyclerRenderSliverList]
+mixin SliverListRecycler on SliverMultiBoxAdaptorWidget {
 
   @override
   SliverMultiBoxAdaptorElement createElement() => RecyclerSliverMultiBoxAdaptorElement(
-        this,
-        replaceMovedChildren: true,
-      );
+    this,
+    replaceMovedChildren: true,
+  );
 
   @override
-  RenderSliverList createRenderObject(BuildContext context) {
+  RecyclerRenderSliverList createRenderObject(BuildContext context) {
     final SliverMultiBoxAdaptorElement element = context as SliverMultiBoxAdaptorElement;
     final renderObject = RecyclerRenderSliverList(childManager: element);
-    _listenForItemCountChanges(renderObject);
+    return renderObject;
+  }
+}
+
+/// A mixin that triggers a layout when the child count changes.
+///
+/// This mixin is useful to avoid rebuilding the entire list when the child count changes.
+mixin SliverListDataSetAppend on SliverListRecycler {
+
+  DataSetAppend? get dataSetAppend =>
+      delegate is DataSetAppend ? delegate as DataSetAppend : null;
+
+  @override
+  RecyclerRenderSliverList createRenderObject(BuildContext context) {
+    var renderObject = super.createRenderObject(context);
+    dataSetAppend?.listenForItemCountChanges(renderObject);
     return renderObject;
   }
 
   @override
-  void updateRenderObject(BuildContext context, covariant RenderObject renderObject) {
+  void updateRenderObject(BuildContext context, covariant RecyclerRenderSliverList renderObject) {
     super.updateRenderObject(context, renderObject);
-    _listenForItemCountChanges(renderObject);
+    dataSetAppend?.listenForItemCountChanges(renderObject);
   }
 
   @override
   void didUnmountRenderObject(covariant RenderObject renderObject) {
-    _stopListeningForItemCountChanges(renderObject);
+    dataSetAppend?.stopListeningForItemCountChanges(renderObject);
     super.didUnmountRenderObject(renderObject);
   }
+}
 
-  void _listenForItemCountChanges(RenderObject renderObject) {
-    if (delegate is DataSetAppend) {
-      final dataSetAppend = this.delegate as DataSetAppend;
-      dataSetAppend.itemCountNotifier
-          ?.removeListener(renderObject.markNeedsLayoutForSizedByParentChange);
-      dataSetAppend.itemCountNotifier
-          ?.addListener(renderObject.markNeedsLayoutForSizedByParentChange);
-    }
+/// A mixin that provides visibility change callback for [RecyclerRenderSliverList].
+mixin SliverListVisibilityChange on SliverListRecycler {
+
+  ItemVisibility? get itemVisibility =>
+      delegate is ItemVisibility ? delegate as ItemVisibility : null;
+
+  @override
+  RecyclerRenderSliverList createRenderObject(BuildContext context) {
+    var renderObject = super.createRenderObject(context);
+    _setChildVisibilityChanged(renderObject);
+    return renderObject;
   }
 
-  void _stopListeningForItemCountChanges(RenderObject renderObject) {
-    if (delegate is DataSetAppend) {
-      (delegate as DataSetAppend)
-          .itemCountNotifier
-          ?.removeListener(renderObject.markNeedsLayoutForSizedByParentChange);
-    }
+  @override
+  void updateRenderObject(BuildContext context, covariant VisibilityChangeMixin renderObject) {
+    super.updateRenderObject(context, renderObject);
+    _setChildVisibilityChanged(renderObject);
+  }
+
+  void _setChildVisibilityChanged(VisibilityChangeMixin renderObject) {
+    renderObject.childVisibilityChanged = itemVisibility?.childVisibilityChanged;
   }
 }

@@ -27,10 +27,10 @@ class _MyAppState extends State<MyApp> {
   void initState() {
     super.initState();
     itemCountNotifier.value = testData.length;
-    timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      testData.add('item ${testData.length}');
-      itemCountNotifier.value = testData.length;
-    });
+    // timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+    //   testData.add('item ${testData.length}');
+    //   itemCountNotifier.value = testData.length;
+    // });
   }
 
   @override
@@ -54,13 +54,17 @@ class _MyAppState extends State<MyApp> {
   }
 
   Widget myList() {
-    return RecyclerListView.builder(
+    return RecyclerListView.separated(
       cacheExtent: 10,
       itemCount: initialItemCount,
       itemType: (index) {
         return index % 2;
       },
-      itemCountNotifier: itemCountNotifier,
+      childCountNotifier: itemCountNotifier,
+      childVisibilityChanged: (index, visible) {
+        // ignore: avoid_print
+        print('item $index visible: $visible');
+      },
       itemBuilder: (_, index) {
         Widget cur = Container(
           height: 100,
@@ -80,6 +84,12 @@ class _MyAppState extends State<MyApp> {
         }
         // cur = KeepAliveWrapper(child: cur);
         return cur;
+      },
+      separatorBuilder: (_, index) {
+        return Container(
+          height: 1,
+          color: Colors.orange,
+        );
       },
     );
   }
