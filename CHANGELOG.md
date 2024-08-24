@@ -1,3 +1,6 @@
+## 0.1.4
+* rename `VisibilityInfo` to `ItemVisibilityInfo` and export it
+
 ## 0.1.3
 * RecyclerListView add `OnVisibilityChanged` callback
 

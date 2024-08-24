@@ -154,7 +154,7 @@ class RecyclerListView extends ListView {
             final itemIndex = index ~/ 2;
             return itemIndex <= count ? itemType.call(itemIndex) : null;
           } : null,
-          childVisibilityChanged: childVisibilityChanged != null ? (int index, VisibilityInfo info) {
+          childVisibilityChanged: childVisibilityChanged != null ? (int index, ItemVisibilityInfo info) {
             if (index.isOdd) {
               return;
             }
@@ -309,7 +309,7 @@ class RecyclerSliverList extends SliverList
             }
             return itemType.call(index ~/ 2);
           } : null,
-          childVisibilityChanged: childVisibilityChanged != null ? (int index, VisibilityInfo info) {
+          childVisibilityChanged: childVisibilityChanged != null ? (int index, ItemVisibilityInfo info) {
             if (index.isOdd) {
               return;
             }

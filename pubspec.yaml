@@ -1,6 +1,6 @@
 name: recycler_list
 description: A Flutter RecyclerView.
-version: 0.1.3
+version: 0.1.4
 homepage: https://github.com/omgseven/recycler_list
 publish_to: https://pub.dev/packages/recycler_list
 

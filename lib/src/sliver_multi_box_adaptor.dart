@@ -35,7 +35,7 @@ mixin RecyclerRenderSliverMultiBoxAdaptorMixin on RenderSliverMultiBoxAdaptor {
   }
 }
 
-typedef OnVisibilityChanged = void Function(int index, VisibilityInfo info);
+typedef OnVisibilityChanged = void Function(int index, ItemVisibilityInfo info);
 
 /// A mixin that provides visibility change callback for [RenderSliverMultiBoxAdaptor].
 mixin VisibilityChangeMixin on RenderSliverMultiBoxAdaptor {
@@ -55,7 +55,7 @@ mixin VisibilityChangeMixin on RenderSliverMultiBoxAdaptor {
     while (child != null) {
       var index = indexOf(child);
       var mainAxisPosition = childMainAxisPosition(child);
-      var visibilityInfo = VisibilityInfo(
+      var visibilityInfo = ItemVisibilityInfo(
         constraints: constraints,
         size: child.size,
         offset: mainAxisPosition,
@@ -69,14 +69,14 @@ mixin VisibilityChangeMixin on RenderSliverMultiBoxAdaptor {
 }
 
 
-/// Data passed to the [VisibilityDetector.onVisibilityChanged] callback.
-class VisibilityInfo {
+/// Data passed to the [onVisibilityChanged] callback.
+class ItemVisibilityInfo {
   /// Constructor.
   ///
   /// 'viewPortSize' is the size of the viewport.
   /// 'size' is the size of the widget.
   /// 'offset' is the offset of the widget in the viewport visible area.
-  const VisibilityInfo({
+  const ItemVisibilityInfo({
     required this.constraints,
     required this.size,
     required this.offset,
@@ -134,7 +134,7 @@ class VisibilityInfo {
 
   /// Returns true if the specified [VisibilityInfo] object has equivalent
   /// visibility to this one.
-  bool matchesVisibility(VisibilityInfo info) {
+  bool matchesVisibility(ItemVisibilityInfo info) {
     // We don't override `operator ==` so that object equality can be separate
     // from whether two [VisibilityInfo] objects are sufficiently similar
     // that we don't need to fire callbacks for both.  This could be pertinent
@@ -152,7 +152,7 @@ class VisibilityInfo {
 
   @override
   bool operator ==(Object other) {
-    return other is VisibilityInfo &&
+    return other is ItemVisibilityInfo &&
         other.constraints == constraints &&
         other.size == size &&
         other.offset == offset;
