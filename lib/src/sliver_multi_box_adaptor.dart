@@ -121,12 +121,12 @@ class ItemVisibilityInfo {
     var axis = axisDirectionToAxis(constraints.axisDirection);
     if (axis == Axis.horizontal) {
       return RangeValues(
-        max(offset, 0),
+        min(max(offset, 0), constraints.viewportMainAxisExtent),
         min(offset + size.width, constraints.viewportMainAxisExtent),
       );
     } else {
       return RangeValues(
-        max(offset, 0),
+        min(max(offset, 0), constraints.viewportMainAxisExtent),
         min(offset + size.height, constraints.viewportMainAxisExtent),
       );
     }

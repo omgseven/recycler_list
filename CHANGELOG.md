@@ -1,3 +1,6 @@
+## 0.1.5
+* fix `visibleRange` assert error
+
 ## 0.1.4
 * rename `VisibilityInfo` to `ItemVisibilityInfo` and export it
 
