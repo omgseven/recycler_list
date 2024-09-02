@@ -98,9 +98,13 @@ class ItemVisibilityInfo {
   ///
   /// 0 means not visible; 1 means fully visible.
   double get visibleFraction {
+    var axis = axisDirectionToAxis(constraints.axisDirection);
+    var size = axis == Axis.horizontal ? this.size.width : this.size.height;
+    if (size <= 0) {
+      return 0;
+    }
     final visibleRange = this.visibleRange;
-    var visibleFraction = (visibleRange.end - visibleRange.start)
-        / constraints.viewportMainAxisExtent;
+    var visibleFraction = (visibleRange.end - visibleRange.start) / size;
 
     if (nearEqual(visibleFraction, 0, _kDefaultTolerance)) {
       visibleFraction = 0;

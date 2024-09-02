@@ -1,3 +1,6 @@
+## 0.1.7
+* fix `visibleFraction` calculate error
+
 ## 0.1.6
 * fix `visibleRange` assert error
 
